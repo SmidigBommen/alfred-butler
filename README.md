@@ -34,12 +34,12 @@ Install the web commands and their implicitly triggerable Codex skill with:
 make install-agent
 ```
 
-This installs the repository as an editable `uv` tool, exposing
+This installs the repository as an editable `uv` tool, exposing `alfred-notes`,
 `alfred-web-search`, `alfred-web-fetch`, and `alfred-web-research` on the user
-path, and copies the version-controlled
-`alfred-search-web` skill into `${CODEX_HOME:-~/.codex}/skills`. Start a new
-Codex session after the first installation so skill discovery can load it.
-Re-run `make install-agent` after changing the skill instructions.
+path. It also copies the version-controlled `alfred-personal-memory` and
+`alfred-search-web` skills into `${CODEX_HOME:-~/.codex}/skills`. Start a new
+Codex session after the first installation so skill discovery can load them.
+Re-run `make install-agent` after changing skill instructions.
 
 The skill chooses the smallest useful workflow: fetch a supplied page, search
 and verify a direct fact, or collect a diverse evidence bundle for a broader
@@ -128,6 +128,45 @@ challenge pages, and records partial search/fetch failures as warnings. Its JSON
 bundle remains marked `untrusted`; Alfred supplies the judgment, comparison,
 synthesis, and citations.
 
+## Notes and personal memory
+
+Alfred stores personal knowledge as portable Markdown in
+`~/.local/share/alfred/notes/` by default. Set `ALFRED_NOTES_DIR` to use another
+location. Each note has TOML metadata, a stable ID, global contextual labels,
+and ordinary wiki links. The derived `.alfred-index.sqlite3` file provides
+full-text search and a weighted relationship graph; it can always be rebuilt
+from Markdown.
+
+```bash
+alfred-notes capture \
+  --title "Continuous improvement" \
+  --body "Always improve and have fun doing it." \
+  --kind preference \
+  --label personal \
+  --label principles
+
+alfred-notes search --query "improvement" --label principles
+alfred-notes related NOTE_ID
+alfred-notes review
+```
+
+The graph represents labels as first-class nodes, avoiding a dense pairwise edge
+for every note sharing a common context. Explicit wiki links receive stronger
+weight than two-hop shared-label relationships. Search and graph results include
+separate text, label, graph, importance, and recency score components so recall
+remains explainable. Links created by the CLI use stable note IDs, preventing
+duplicate or renamed titles from silently changing graph targets. Manual
+title-only links resolve only when the title is unique.
+
+The `alfred-personal-memory` skill recalls relevant context and automatically
+captures durable preferences, decisions, ideas, corrections, and recurring
+working steps without using the internet. Automatic captures enter a review
+queue. Alfred asks before storing sensitive personal information and refuses to
+store credentials. The `sensitive` marker is a policy gate, not independent
+encryption. Use `show`, `update --accept`, `link`, `archive`, `export`, and
+`rebuild-index` to inspect and maintain the knowledge base. An explicit
+`delete NOTE_ID --confirm` permanently removes a note and its derived graph data.
+
 ## Tests and development
 
 ```bash
@@ -155,6 +194,9 @@ they do not replace deterministic transport fixtures.
 - Search snippets and fetched page bodies are untrusted data. The tools never
   execute page content or instructions; the assistant must preserve that
   boundary during synthesis.
+- Personal notes stay local and must never be inserted into web requests unless
+the user explicitly requests that exact disclosure. Credentials belong in a
+  password manager, not Alfred's notes.
 - Search providers still receive the server's IP address and queries. A private
   SearXNG instance improves control but does not provide anonymity.
 - SearXNG is AGPL-3.0-or-later. If we modify or publicly serve it, review the

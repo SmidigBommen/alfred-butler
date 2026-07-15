@@ -13,6 +13,7 @@ dependencies = []
 dev = ["ruff==0.15.21"]
 
 [project.scripts]
+alfred-notes = "alfred_tools.notes.cli:main"
 alfred-web-search = "alfred_tools.web.search:main"
 alfred-web-fetch = "alfred_tools.web.fetch:main"
 alfred-web-research = "alfred_tools.web.research:main"

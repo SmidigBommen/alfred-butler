@@ -1,4 +1,13 @@
 .cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+htmlcov/
+.coverage
+.alfred-index.sqlite3
 *.egg-info/
 __pycache__/
+*.py[cod]
 infra/searxng/.env

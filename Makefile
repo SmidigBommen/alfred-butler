@@ -10,16 +10,21 @@ SEARXNG_DIR := infra/searxng
 SEARXNG_CONFIG := $(abspath $(SEARXNG_DIR)/settings.yml)
 SEARXNG_LIMITER_CONFIG := $(abspath $(SEARXNG_DIR)/limiter.toml)
 SEARXNG_ENV := $(abspath $(SEARXNG_DIR)/.env)
-ALFRED_SKILL_SOURCE := $(abspath skills/alfred-search-web)
-ALFRED_SKILL_DESTINATION := $(CODEX_HOME)/skills/alfred-search-web
+ALFRED_WEB_SKILL_SOURCE := $(abspath skills/alfred-search-web)
+ALFRED_WEB_SKILL_DESTINATION := $(CODEX_HOME)/skills/alfred-search-web
+ALFRED_MEMORY_SKILL_SOURCE := $(abspath skills/alfred-personal-memory)
+ALFRED_MEMORY_SKILL_DESTINATION := $(CODEX_HOME)/skills/alfred-personal-memory
 
 .PHONY: install-agent check lint format test search-up search-down search-restart search-status search-logs search-health
 
 install-agent:
 	$(UV) tool install --force --editable .
 	PYTHONPATH=src $(PYTHON) -m alfred_tools.install_skill \
-		--source $(ALFRED_SKILL_SOURCE) \
-		--destination $(ALFRED_SKILL_DESTINATION)
+		--source $(ALFRED_WEB_SKILL_SOURCE) \
+		--destination $(ALFRED_WEB_SKILL_DESTINATION)
+	PYTHONPATH=src $(PYTHON) -m alfred_tools.install_skill \
+		--source $(ALFRED_MEMORY_SKILL_SOURCE) \
+		--destination $(ALFRED_MEMORY_SKILL_DESTINATION)
 
 check: lint test
 

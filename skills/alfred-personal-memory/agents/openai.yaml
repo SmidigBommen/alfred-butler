@@ -1,0 +1,7 @@
+interface:
+  display_name: "Alfred Memory"
+  short_description: "Recall and grow Alfred local personal graph"
+  default_prompt: "Use $alfred-personal-memory to recall relevant context and preserve durable personal knowledge."
+
+policy:
+  allow_implicit_invocation: true
