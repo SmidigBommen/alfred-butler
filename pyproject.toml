@@ -11,15 +11,20 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["ruff==0.15.21"]
+voice = ["faster-whisper>=1,<2"]
 
 [project.scripts]
 alfred-notes = "alfred_tools.notes.cli:main"
+alfred-serve = "alfred_tools.orchestrator.server:main"
 alfred-web-search = "alfred_tools.web.search:main"
 alfred-web-fetch = "alfred_tools.web.fetch:main"
 alfred-web-research = "alfred_tools.web.research:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+alfred_tools = ["orchestrator/static/*"]
 
 [tool.ruff]
 target-version = "py311"

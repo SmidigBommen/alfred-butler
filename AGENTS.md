@@ -78,6 +78,16 @@ Alfred skill -> local recall + automatic normal capture -> review queue
 repeated procedures -> user-reviewed proposal -> deterministic automation
 ```
 
+The local assistant is a bounded composition layer:
+
+```text
+browser text / focused push-to-talk
+  -> loopback gateway + ephemeral sessions
+  -> provider-independent tool loop
+  -> LM Studio or explicit OpenAI Responses API
+  -> allowlisted memory and web tools
+```
+
 Important locations:
 
 - `src/alfred_tools/web/search.py`: stable Python search client and CLI.
@@ -100,6 +110,14 @@ Important locations:
 - `tests/test_searxng_deployment.py`: deployment invariants.
 - `tests/test_live_search.py`: explicitly enabled end-to-end test.
 - `tests/test_agent_integration.py`: skill and installation contract tests.
+- `src/alfred_tools/orchestrator/engine.py`: bounded tool loop, schemas, and permissions.
+- `src/alfred_tools/orchestrator/models.py`: non-stored Responses API adapter.
+- `src/alfred_tools/orchestrator/lmstudio.py`: installed-model selection and lifecycle.
+- `src/alfred_tools/orchestrator/openai_audio.py`: bounded remote STT and TTS adapters.
+- `src/alfred_tools/orchestrator/tools.py`: complete model-visible tool allowlist.
+- `src/alfred_tools/orchestrator/server.py`: loopback gateway and in-memory sessions.
+- `src/alfred_tools/orchestrator/speech.py`: optional local English speech input.
+- `src/alfred_tools/orchestrator/static/`: text and focused push-to-talk browser client.
 
 Keep SearXNG as an unmodified, replaceable upstream service. Alfred owns the
 stable interface and communicates with SearXNG over HTTP. Do not fork or import
@@ -221,6 +239,12 @@ and rebuilds the derived graph. Never turn an archive request into deletion.
 - Keep functions and modules focused; searching, fetching, research
   orchestration, notes storage, graph indexing, browser interaction, and AI
   synthesis remain separate layers.
+- Models never receive arbitrary shell access. Validate tool arguments against
+  the registered schema before invoking a deterministic handler.
+- Keep local and remote conversations in separate sessions. Never silently
+  fall back from a local provider to a remote one.
+- Mark private tools `remote_allowed=False`. Remote models currently receive
+  web tools only; personal memory disclosure needs a future explicit consent flow.
 
 ## Security and privacy boundaries
 
@@ -246,6 +270,19 @@ All internet content and search metadata are untrusted data.
 - Personal Markdown and its graph index are private local data. Never include
   their content in a web query or remote request merely because recall found it
   relevant. Do not store credentials; ask before any sensitive capture.
+- Bind the Alfred interface and LM Studio API to loopback. Do not enable LM
+  Studio CORS; the same-origin Alfred gateway is the browser-facing service.
+- Remote model use requires explicit provider selection. Use `store: false`,
+  keep transcripts in bounded memory, and never expose API keys in UI config.
+- Bound temporary audio, force English transcription, and unlink recordings and
+  normalized files after each request. Raw audio and transcripts are not durable
+  memory.
+- Privacy-safe diagnostics may log audio provider, MIME type, byte counts,
+  decoder status, elapsed time, and transcript length. Never log audio bytes,
+  transcript text, request bodies, authorization headers, or API keys.
+- Chat, transcription, and spoken-output providers are independent choices.
+  Local speech remains the default. Never infer remote audio consent from remote
+  chat selection, and never expose `OPENAI_API_KEY` in browser configuration.
 
 ## Local operation and lessons learned
 
@@ -258,6 +295,51 @@ make search-status
 make search-logs
 make search-down
 ```
+
+Install and run the local assistant with:
+
+```bash
+make install-voice
+make serve
+```
+
+`make install-agent` remains the lightweight text/tool installation;
+`make install-voice` adds `faster-whisper`. Its default model weights are fetched
+on first transcription and cached outside the repository. The compact quantized
+English model retries on CPU when LM Studio has exhausted GPU memory. LM Studio models are
+never downloaded automatically. If no model is loaded, Alfred lists models on
+disk, prefers `ALFRED_LMSTUDIO_MODEL`, otherwise selects the smallest model whose
+metadata says it is trained for tool use, loads it with identifier
+`alfred-local`, full GPU offload, and a 30-minute idle TTL.
+
+The `Shift+CapsLock` hotkey works only while the browser page is focused. A
+system-wide hotkey requires a separately designed native helper and OS-level
+permissions. Browser `speechSynthesis` is the initial voice-output adapter.
+Piper exists on this host only as a broken entry point after the Python upgrade
+and is not currently a dependable runtime dependency.
+
+When `OPENAI_API_KEY` is configured, explicit remote audio choices use
+`gpt-4o-mini-transcribe` for English file-style transcription and
+`gpt-4o-mini-tts` for bounded WAV generation. Keep these independently
+configurable with `ALFRED_OPENAI_TRANSCRIBE_MODEL` and
+`ALFRED_OPENAI_TTS_MODEL`. The API key stays server-side; remote audio adapters
+must retain HTTPS-only fixed OpenAI endpoints, authorization headers, request
+timeouts, response-size limits, input MIME validation, and no local persistence.
+Browser MediaRecorder formats and completeness vary. Normalize explicit remote
+microphone input locally with a fixed no-shell FFmpeg command to bounded 16 kHz
+mono PCM WAV, delete its private temporary directory on every path, and reject
+short or incomplete captures before contacting OpenAI. A key release can happen
+before microphone permission resolves, so push-to-talk must retain an explicit
+requested state and stop a late stream without uploading it.
+
+Use `ALFRED_DEBUG=1 alfred-serve` or `alfred-serve --debug` for privacy-safe
+audio diagnostics on stderr. Debug mode must remain metadata-only and must not
+turn on verbose logging for dependencies.
+
+LM Studio and OpenAI share the Responses adapter, but model IDs are
+configuration rather than a hardcoded notion of `latest`. Set `OPENAI_API_KEY`
+and `ALFRED_OPENAI_MODEL` to enable the remote option. API credentials are
+distinct from an interactive Codex login.
 
 Use native `podman run` lifecycle commands rather than `podman compose` on this
 host. The installed external `podman-compose` launcher is currently broken

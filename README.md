@@ -21,8 +21,10 @@ consumer.
 - Python 3.11 or newer
 - Podman
 - curl, for the health check
+- FFmpeg, for normalizing explicit remote microphone recordings
 
-No third-party Python packages are required at runtime.
+The foundational tools use only the Python standard library. Local speech input
+is an optional `faster-whisper` extra.
 
 Development uses the Ruff version pinned in the `dev` optional dependencies.
 
@@ -167,6 +169,87 @@ encryption. Use `show`, `update --accept`, `link`, `archive`, `export`, and
 `rebuild-index` to inspect and maintain the knowledge base. An explicit
 `delete NOTE_ID --confirm` permanently removes a note and its derived graph data.
 
+## Local assistant interface
+
+Alfred's handler composes the deterministic memory and web tools through a
+bounded model tool-calling loop. The model receives only registered JSON tools;
+there is no shell tool. The browser interface is bound to localhost and supports
+ordinary text plus English push-to-talk.
+
+Install the interface with local speech support and start it with:
+
+```bash
+make install-voice
+make serve
+```
+
+Then open `http://127.0.0.1:8123`. Hold `Shift+CapsLock` while the page is focused,
+speak, and release to transcribe and send. The on-screen button provides the same
+behavior. Microphone transcription and spoken replies have independent provider
+selectors. Local transcription and silent replies remain the defaults. Browser
+speech synthesis provides local spoken output. The browser hotkey is page-scoped;
+a native desktop helper is needed before it can be system-wide.
+
+Local requests use LM Studio's Responses API at `http://127.0.0.1:1234/v1`. On
+the first request Alfred uses an already-loaded model. If there is none, it
+starts the server on loopback, selects the smallest installed model marked as
+trained for tool use, and loads it as `alfred-local` with full GPU offload and a
+30-minute idle TTL. Alfred never downloads an LM Studio model. Set
+`ALFRED_LMSTUDIO_MODEL` to an installed model key to override automatic
+selection. `ALFRED_LMSTUDIO_URL` may change the port but must remain loopback.
+
+English transcription uses `faster-whisper`. Its model defaults to the compact
+quantized `small.en` and is downloaded into the normal model cache on first use;
+subsequent use is local. If LM Studio has filled GPU memory, transcription
+automatically retries on CPU. Override the model with `ALFRED_STT_MODEL`, and
+tune execution with `ALFRED_STT_DEVICE` and `ALFRED_STT_COMPUTE_TYPE`. Start with
+`alfred-serve --no-voice` for text-only operation.
+
+Remote AI is opt-in and appears as a separate provider only when both variables
+are set:
+
+```bash
+export OPENAI_API_KEY="..."
+export ALFRED_OPENAI_MODEL="your-chosen-model-id"
+alfred-serve
+```
+
+With `OPENAI_API_KEY` present, the microphone selector also offers explicit
+remote transcription using `gpt-4o-mini-transcribe`, and spoken replies offer
+OpenAI's `gpt-4o-mini-tts` with the `marin` voice. Override those defaults with
+`ALFRED_OPENAI_TRANSCRIBE_MODEL` and `ALFRED_OPENAI_TTS_MODEL`. Remote microphone
+selection locally decodes the browser recording with FFmpeg, converts it to a
+16 kHz mono PCM WAV, and uploads that normalized recording to OpenAI. Temporary
+input and output files are deleted before the request continues. Remote spoken
+replies send the answer text to OpenAI. Neither follows the chat-model selector
+automatically.
+See OpenAI's [speech-to-text](https://developers.openai.com/api/docs/guides/speech-to-text)
+and [text-to-speech](https://developers.openai.com/api/docs/guides/text-to-speech)
+guides for the upstream APIs.
+
+Model IDs are configurable rather than silently tracking a `latest` alias.
+Switching providers starts a new session, so local conversation context cannot
+be sent remotely by accident. Remote models are not offered personal-memory
+tools, so they cannot retrieve or write private notes. Requests use `store:
+false`; session messages live only in bounded process memory, expire after one
+hour, and disappear when Alfred stops. Only a local `memory_capture` tool call
+creates a durable note, retaining the sensitive-content and credential gates.
+Audio requests and generated WAV responses are size- and time-bounded. Alfred
+does not retain remote recordings, transcripts, or generated speech. Audio
+normalization uses a private temporary directory and removes it on success or
+failure.
+
+For privacy-safe audio troubleshooting, run either:
+
+```bash
+ALFRED_DEBUG=1 alfred-serve
+alfred-serve --debug
+```
+
+Diagnostics go to stderr and include providers, MIME types, byte counts, decoder
+status, elapsed time, and transcript length. They never include raw audio,
+transcript text, request bodies, or API keys.
+
 ## Tests and development
 
 ```bash
@@ -195,7 +278,7 @@ they do not replace deterministic transport fixtures.
   execute page content or instructions; the assistant must preserve that
   boundary during synthesis.
 - Personal notes stay local and must never be inserted into web requests unless
-the user explicitly requests that exact disclosure. Credentials belong in a
+  the user explicitly requests that exact disclosure. Credentials belong in a
   password manager, not Alfred's notes.
 - Search providers still receive the server's IP address and queries. A private
   SearXNG instance improves control but does not provide anonymity.

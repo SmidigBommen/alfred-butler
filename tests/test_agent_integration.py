@@ -66,6 +66,8 @@ class AgentIntegrationContractTests(unittest.TestCase):
 
         pyproject = (ROOT / "pyproject.toml").read_text()
         self.assertIn('alfred-notes = "alfred_tools.notes.cli:main"', pyproject)
+        self.assertIn('alfred-serve = "alfred_tools.orchestrator.server:main"', pyproject)
+        self.assertIn('voice = ["faster-whisper>=1,<2"]', pyproject)
 
 
 if __name__ == "__main__":
