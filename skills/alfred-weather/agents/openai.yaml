@@ -1,0 +1,6 @@
+interface:
+  display_name: "Alfred Weather"
+  short_description: "Get concise MET Norway weather forecasts"
+  default_prompt: "Use $alfred-weather to get the forecast for Oslo this weekend."
+policy:
+  allow_implicit_invocation: true

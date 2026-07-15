@@ -85,19 +85,39 @@ browser text / focused push-to-talk
   -> loopback gateway + ephemeral sessions
   -> provider-independent tool loop
   -> LM Studio or explicit OpenAI Responses API
-  -> allowlisted memory and web tools
+  -> allowlisted memory, web, and weather tools
+```
+
+`SYSTEM_PROMPT` in `orchestrator/server.py` is shared by local and remote chat
+backends. It owns tool selection, memory/privacy rules, source handling, approval
+boundaries, and conversational style. Alfred is terse by default and uses a
+composed, discreet, understated British-butler persona, emphasizing practical
+applications and concrete next actions when relevant. Preserve the ability to
+expand on request and never let persona or brevity override safety, correctness,
+or honest failure reporting. Keep this chat persona separate from TTS delivery
+instructions.
+
+Weather is a separate deterministic network tool:
+
+```text
+public place -> cached Nominatim lookup -> rounded coordinates
+rounded coordinates -> cached MET Norway Locationforecast -> zoned normalized forecast
+Alfred -> concise interpretation with provider attribution
 ```
 
 Important locations:
 
+- `src/alfred_tools/config.py`: inert allowlisted local preference reader.
 - `src/alfred_tools/web/search.py`: stable Python search client and CLI.
 - `src/alfred_tools/web/fetch.py`: guarded public-page retrieval and extraction.
 - `src/alfred_tools/web/research.py`: deterministic multi-query evidence collector.
+- `src/alfred_tools/weather/forecast.py`: geocoding, MET forecast, cache, and CLI.
 - `src/alfred_tools/notes/store.py`: Markdown source and rebuildable graph index.
 - `src/alfred_tools/notes/cli.py`: stable JSON notes and memory CLI.
 - `src/alfred_tools/install_skill.py`: repeatable personal skill installer.
 - `skills/alfred-search-web/`: version-controlled implicit Codex skill.
 - `skills/alfred-personal-memory/`: automatic offline recall and capture skill.
+- `skills/alfred-weather/`: implicit dedicated-forecast skill.
 - `infra/searxng/settings.yml`: minimal SearXNG overrides.
 - `infra/searxng/limiter.toml`: loopback proxy identity configuration.
 - `infra/searxng/.env.example`: environment template; the real `.env` is ignored.
@@ -105,6 +125,7 @@ Important locations:
 - `tests/test_web_search.py`: deterministic search contract tests.
 - `tests/test_web_fetch.py`: deterministic SSRF, extraction, and cache tests.
 - `tests/test_web_research.py`: deterministic ranking and fallback tests.
+- `tests/test_weather_forecast.py`: request, normalization, cache, transport, and CLI tests.
 - `tests/test_notes_store.py`: storage, graph, privacy, and ranking tests.
 - `tests/test_notes_cli.py`: command contract tests.
 - `tests/test_searxng_deployment.py`: deployment invariants.
@@ -184,6 +205,41 @@ fetch, direct search-then-fetch, and multi-source research, then interprets the
 evidence and provides direct source links. Do not duplicate client
 implementation inside the skill.
 
+## Weather forecast contract
+
+`weather.forecast` accepts either one public place name or a complete
+latitude/longitude pair, never both. The user-facing CLI and orchestrator may
+inject a locally configured default when neither is supplied. Place strings are
+limited to 200 characters; coordinates are rounded to four decimals before use.
+Forecast output is bounded to one current forecast, at most 48 hourly entries,
+and at most nine daily summaries. Convert provider UTC timestamps with `zoneinfo`
+before daily grouping and always expose the applied IANA zone.
+
+Place lookup uses the public OpenStreetMap Nominatim service for this initial
+single-user installation. Identify Alfred with a real project URL, serialize
+lookups to at most one request per second, cache successful names for 30 days,
+and never implement autocomplete, systematic lookup, or bulk geocoding. Keep the
+geocoder replaceable because its public usage policy can change or access can be
+withdrawn. `ALFRED_NOMINATIM_URL`, `ALFRED_MET_FORECAST_URL`, and
+`ALFRED_WEATHER_USER_AGENT` provide runtime replacement and identification
+without requiring a software update.
+
+Forecast data uses MET Norway Locationforecast 2.0 `compact`. Identify Alfred,
+use HTTPS, truncate coordinates, accept gzip, bound responses and time, honor
+`Expires`, revalidate stale cache entries with the exact `Last-Modified` value,
+and treat HTTP 203 as an observable deprecation/beta warning. Attribute MET
+Norway under CC BY 4.0 and OpenStreetMap contributors when geocoding was used.
+Do not use Yr names or logos or imply that Alfred is an official Yr, NRK, or MET
+Norway service.
+
+The CLI preserves the project convention: normalized JSON on stdout, JSON errors
+on stderr, exit code `1` for input errors, and exit code `2` for backend errors.
+The model-visible adapter accepts an optional place and one-to-nine day limit,
+always returns the next 24 bounded hourly entries, and exposes only provider,
+location, cache, warnings, and exact forecast URL in the activity trace. An
+omitted place uses the private configured default without placing that default in
+the model-visible schema or system prompt.
+
 ## Notes and graph memory contract
 
 Markdown under `${ALFRED_NOTES_DIR:-~/.local/share/alfred/notes}` is the durable
@@ -237,8 +293,8 @@ and rebuilds the derived graph. Never turn an archive request into deletion.
   individual engine failures as warnings.
 - Keep stdout machine-readable. Send diagnostics to stderr or service logs.
 - Keep functions and modules focused; searching, fetching, research
-  orchestration, notes storage, graph indexing, browser interaction, and AI
-  synthesis remain separate layers.
+  orchestration, weather retrieval, notes storage, graph indexing, browser
+  interaction, and AI synthesis remain separate layers.
 - Models never receive arbitrary shell access. Validate tool arguments against
   the registered schema before invoking a deterministic handler.
 - Keep local and remote conversations in separate sessions. Never silently
@@ -292,6 +348,10 @@ All internet content and search metadata are untrusted data.
   counts, cache markers, warnings, status, and duration. Never derive a generic
   trace from arbitrary tool input/output: memory traces must not expose note
   contents, and web traces must omit fetched page text and model prompts.
+- Weather place names and coordinates are external request metadata. Use cities,
+  regions, and public landmarks by default; do not submit a private street
+  address unless the user explicitly requests that disclosure. Preserve MET and
+  Nominatim identification, caching, rate limits, licenses, and attribution.
 
 ## Local operation and lessons learned
 
@@ -327,6 +387,15 @@ from 1 through 3600 seconds with `ALFRED_LMSTUDIO_TIMEOUT`. OpenAI retains the
 shorter default. A timeout applies to each model response; orchestration round
 and call caps still bound the overall loop.
 
+Installing the base editable tool with `uv tool install --force` replaces the
+entire tool environment and therefore removes optional dependencies. This once
+caused local transcription to remain visible in the UI but fail when invoked.
+`make install-voice` now writes the owner-only
+`~/.config/alfred/voice.enabled` capability marker, and `make install-agent`
+preserves the `voice` extra whenever that marker exists. Keep the regression
+contract in `tests/test_agent_integration.py`; do not simplify the installer back
+to an unconditional base reinstall.
+
 The `Shift+CapsLock` hotkey works only while the browser page is focused. A
 system-wide hotkey requires a separately designed native helper and OS-level
 permissions. Browser `speechSynthesis` is the initial voice-output adapter.
@@ -358,6 +427,11 @@ LM Studio and OpenAI share the Responses adapter, but model IDs are
 configuration rather than a hardcoded notion of `latest`. Set `OPENAI_API_KEY`
 and `ALFRED_OPENAI_MODEL` to enable the remote option. API credentials are
 distinct from an interactive Codex login.
+
+Local and remote chat receive the same server-owned system prompt. Prompt style
+is advisory model behavior, so keep focused contract tests for required wording
+and validate representative responses when changing it. Deterministic tool and
+permission enforcement must remain outside the prompt.
 
 LM Studio currently warns that OpenAI-compatible function tools with `strict:
 true` are not supported and that it ignores the flag. Keep advertising strict
@@ -398,6 +472,21 @@ Use stable-ID wiki links for programmatic connections; title-only links are for
 human editing and must remain unambiguous. Automatic capture is intentionally
 reviewable rather than invisible. Recurring procedures are candidates for a
 future tested tool, not permission to create or execute automation silently.
+
+MET Norway does not resolve place names; its documentation explicitly requires a
+separate geocoder. Yr uses additional location infrastructure that is not exposed
+as part of Locationforecast. For the initial single-user tool, Nominatim provides
+global named-place lookup while direct coordinates remain available to bypass it.
+Forecast timestamps from Locationforecast are UTC. Alfred converts them using an
+explicit configured IANA zone, never a guessed zone derived from coordinates.
+
+Personal defaults live in `~/.config/alfred/preferences.env` with owner-only
+permissions. The parser allowlists only `ALFRED_TIME_ZONE` and
+`ALFRED_WEATHER_LOCATION`, performs no shell expansion, and gives process
+environment variables precedence. Keep actual personal values out of the
+repository, examples, logs, and model prompts. The low-level `ForecastClient`
+defaults deterministically to UTC; only user-facing construction injects local
+preferences.
 
 The repository may contain user changes or untracked files. Preserve them and
 do not perform destructive Git operations. Changes are not committed unless the

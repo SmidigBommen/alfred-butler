@@ -19,6 +19,7 @@ alfred-serve = "alfred_tools.orchestrator.server:main"
 alfred-web-search = "alfred_tools.web.search:main"
 alfred-web-fetch = "alfred_tools.web.fetch:main"
 alfred-web-research = "alfred_tools.web.research:main"
+alfred-weather = "alfred_tools.weather.forecast:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

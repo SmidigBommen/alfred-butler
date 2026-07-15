@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from alfred_tools.orchestrator.engine import ModelReply, Tool, ToolCall
 from alfred_tools.orchestrator.server import (
+    SYSTEM_PROMPT,
     ChatService,
     EphemeralSessions,
     configured_audio,
@@ -63,6 +64,14 @@ class OrchestratorServerTests(unittest.TestCase):
         self.assertEqual(result["answer"], "reply: Good evening")
         self.assertEqual(result["answer_blocks"][0]["type"], "paragraph")
         self.assertEqual(result["session_id"], "session-one")
+
+    def test_system_prompt_uses_the_requested_terse_practical_butler_persona(self):
+        self.assertIn("tersely by default", SYSTEM_PROMPT)
+        self.assertIn("British butler", SYSTEM_PROMPT)
+        self.assertIn("practical applications", SYSTEM_PROMPT)
+        self.assertIn("concrete next actions", SYSTEM_PROMPT)
+        self.assertIn("when the user asks for detail", SYSTEM_PROMPT)
+        self.assertIn("without theatrical affectation", SYSTEM_PROMPT)
 
     def test_does_not_allow_a_session_to_switch_from_local_to_remote(self):
         self.service.chat({"session_id": "private", "backend": "local", "message": "local context"})

@@ -6,9 +6,15 @@ import os
 from pathlib import Path
 from typing import Any
 
+from alfred_tools.config import get_preference
 from alfred_tools.notes.cli import default_notes_root
 from alfred_tools.notes.store import NoteStore
 from alfred_tools.orchestrator.engine import Tool
+from alfred_tools.weather.forecast import (
+    ForecastClient,
+    ForecastRequest,
+    SQLiteWeatherCache,
+)
 from alfred_tools.web.fetch import FetchClient, FetchRequest, SQLiteFetchCache
 from alfred_tools.web.research import ResearchClient, ResearchRequest
 from alfred_tools.web.search import (
@@ -97,7 +103,37 @@ def _research_trace(arguments: dict[str, Any], output: Any, status: str) -> dict
     }
 
 
-def build_alfred_tools(*, notes: Any, search: Any, fetch: Any, research: Any) -> tuple[Tool, ...]:
+def _weather_trace(arguments: dict[str, Any], output: Any, status: str) -> dict[str, Any]:
+    value = output if isinstance(output, dict) else {}
+    location = value.get("location") if isinstance(value.get("location"), dict) else {}
+    source = value.get("source") if isinstance(value.get("source"), dict) else {}
+    url = _short(source.get("forecast_url"), 4_096)
+    warnings = [
+        {"type": "provider", "error": _short(warning)}
+        for warning in value.get("warnings", [])
+        if _short(warning)
+    ]
+    return {
+        "location": _short(location.get("name") or arguments.get("location"), 300),
+        "provider": _short(source.get("provider"), 100),
+        "cached": bool(value.get("cached", False)),
+        "sources": [
+            {
+                "title": f"MET Norway forecast for {_short(location.get('name'), 200)}",
+                "url": url,
+                "cached": bool(value.get("cached", False)),
+            }
+        ]
+        if url
+        else [],
+        "warnings": warnings[:8],
+        "error": _failure(output, status),
+    }
+
+
+def build_alfred_tools(
+    *, notes: Any, search: Any, fetch: Any, research: Any, weather: Any
+) -> tuple[Tool, ...]:
     def memory_search(arguments: dict[str, Any]) -> dict[str, Any]:
         query = str(arguments["query"])
         return {"query": query, "results": notes.search(query, limit=8)}
@@ -135,6 +171,16 @@ def build_alfred_tools(*, notes: Any, search: Any, fetch: Any, research: Any) ->
                 results_per_query=5,
                 max_chars_per_source=12_000,
                 language="en",
+            )
+        )
+
+    def weather_forecast(arguments: dict[str, Any]) -> dict[str, Any]:
+        location = arguments.get("location") or getattr(weather, "default_location", None)
+        return weather.forecast(
+            ForecastRequest(
+                location=str(location) if location else None,
+                days=int(arguments.get("days", 5)),
+                hours=24,
             )
         )
 
@@ -227,6 +273,27 @@ def build_alfred_tools(*, notes: Any, search: Any, fetch: Any, research: Any) ->
             handler=web_research,
             trace_builder=_research_trace,
         ),
+        Tool(
+            name="weather_forecast",
+            description=(
+                "Get current conditions, the next 24 hours, and up to nine forecast days "
+                "for a city, region, or named public place. Omit location to use Alfred's "
+                "locally configured default. Weather data comes from MET Norway. "
+                "Do not submit private street addresses without the user's explicit consent."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "maxLength": 200},
+                    "days": {"type": "integer", "minimum": 1, "maximum": 9},
+                },
+                "required": [],
+                "additionalProperties": False,
+            },
+            permission="network_read",
+            handler=weather_forecast,
+            trace_builder=_weather_trace,
+        ),
     )
 
 
@@ -240,9 +307,15 @@ def default_alfred_tools() -> tuple[Tool, ...]:
     )
     fetch = FetchClient(cache=SQLiteFetchCache(cache_root / "fetch.sqlite3"))
     research = ResearchClient(search_client=search, fetch_client=fetch)
+    weather = ForecastClient(
+        cache=SQLiteWeatherCache(cache_root / "weather.sqlite3"),
+        time_zone=get_preference("ALFRED_TIME_ZONE", "UTC") or "UTC",
+        default_location=get_preference("ALFRED_WEATHER_LOCATION"),
+    )
     return build_alfred_tools(
         notes=NoteStore(default_notes_root()),
         search=search,
         fetch=fetch,
         research=research,
+        weather=weather,
     )

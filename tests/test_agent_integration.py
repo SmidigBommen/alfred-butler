@@ -7,6 +7,7 @@ from alfred_tools.install_skill import install_skill
 ROOT = Path(__file__).resolve().parents[1]
 WEB_SKILL = ROOT / "skills" / "alfred-search-web"
 MEMORY_SKILL = ROOT / "skills" / "alfred-personal-memory"
+WEATHER_SKILL = ROOT / "skills" / "alfred-weather"
 
 
 class SkillInstallerTests(unittest.TestCase):
@@ -56,6 +57,18 @@ class AgentIntegrationContractTests(unittest.TestCase):
         self.assertIn("sensitive", instructions.lower())
         self.assertIn("allow_implicit_invocation: true", metadata)
 
+    def test_weather_skill_uses_the_dedicated_attributed_forecast_command(self):
+        instructions = (WEATHER_SKILL / "SKILL.md").read_text()
+        metadata = (WEATHER_SKILL / "agents" / "openai.yaml").read_text()
+
+        self.assertNotIn("TODO", instructions)
+        self.assertIn("alfred-weather", instructions)
+        self.assertIn("MET Norway", instructions)
+        self.assertIn("OpenStreetMap", instructions)
+        self.assertIn("time_zone", instructions)
+        self.assertIn("IANA", instructions)
+        self.assertIn("allow_implicit_invocation: true", metadata)
+
     def test_makefile_has_repeatable_agent_installation(self):
         makefile = (ROOT / "Makefile").read_text()
 
@@ -63,10 +76,15 @@ class AgentIntegrationContractTests(unittest.TestCase):
         self.assertIn("$(UV) tool install --force --editable", makefile)
         self.assertIn("alfred_tools.install_skill", makefile)
         self.assertIn("alfred-personal-memory", makefile)
+        self.assertIn("alfred-weather", makefile)
+        self.assertIn("ALFRED_VOICE_MARKER", makefile)
+        self.assertIn("test -f $(ALFRED_VOICE_MARKER)", makefile)
+        self.assertIn("install -D -m 600 /dev/null $(ALFRED_VOICE_MARKER)", makefile)
 
         pyproject = (ROOT / "pyproject.toml").read_text()
         self.assertIn('alfred-notes = "alfred_tools.notes.cli:main"', pyproject)
         self.assertIn('alfred-serve = "alfred_tools.orchestrator.server:main"', pyproject)
+        self.assertIn('alfred-weather = "alfred_tools.weather.forecast:main"', pyproject)
         self.assertIn('voice = ["faster-whisper>=1,<2"]', pyproject)
 
 
