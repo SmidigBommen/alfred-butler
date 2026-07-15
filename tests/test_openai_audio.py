@@ -122,7 +122,7 @@ class OpenAIAudioTests(unittest.TestCase):
         transport = RecordingTransport([AudioResponse(b"RIFF-audio", "audio/wav")])
         synthesizer = OpenAISpeechSynthesizer(api_key="test-secret", transport=transport)
 
-        result = synthesizer.synthesize("Good evening.", voice="marin")
+        result = synthesizer.synthesize("Good evening.")
 
         self.assertEqual(result.body, b"RIFF-audio")
         self.assertEqual(result.content_type, "audio/wav")
@@ -134,22 +134,23 @@ class OpenAIAudioTests(unittest.TestCase):
             json.loads(body),
             {
                 "model": "gpt-4o-mini-tts",
-                "voice": "marin",
+                "voice": "cedar",
                 "input": "Good evening.",
-                "instructions": "Speak as a calm, concise English personal assistant.",
+                "instructions": (
+                    "Speak in a warm, composed masculine voice with a natural modern British "
+                    "English accent, medium-low pitch, measured pace, and understated delivery. "
+                    "Avoid an exaggerated theatrical accent."
+                ),
                 "response_format": "wav",
             },
         )
 
-    def test_rejects_unsupported_audio_and_invalid_voice_before_network(self):
+    def test_rejects_unsupported_audio_before_network(self):
         transport = RecordingTransport([])
         transcriber = OpenAITranscriber(api_key="secret", transport=transport)
-        synthesizer = OpenAISpeechSynthesizer(api_key="secret", transport=transport)
 
         with self.assertRaisesRegex(ValueError, "content type"):
             transcriber.transcribe(b"audio", "application/octet-stream")
-        with self.assertRaisesRegex(ValueError, "voice"):
-            synthesizer.synthesize("Hello", voice="../secret")
 
         self.assertEqual(transport.calls, [])
 

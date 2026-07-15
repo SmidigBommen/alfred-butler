@@ -62,6 +62,40 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(json.loads(tool_result.content), {"matches": ["tea"]})
         self.assertEqual(tool_result.tool_call_id, "call-1")
 
+    def test_tool_event_contains_only_the_registered_safe_summary(self):
+        call = ToolCall(id="web-1", name="web_research", arguments='{"queries":["ships"]}')
+        model = ScriptedModel([ModelReply(tool_calls=(call,)), ModelReply(text="Found it.")])
+        output = {
+            "queries": ["ships"],
+            "sources": [
+                {
+                    "title": "Museum",
+                    "url": "https://example.com/ships",
+                    "text": "full untrusted page evidence must not enter the trace",
+                }
+            ],
+        }
+        tool = Tool(
+            name="web_research",
+            description="Research the web",
+            input_schema={"type": "object"},
+            permission="network_read",
+            handler=lambda arguments: output,
+            trace_builder=lambda arguments, value, status: {
+                "queries": arguments["queries"],
+                "source_count": len(value["sources"]),
+            },
+        )
+
+        result = Orchestrator(model=model, tools=(tool,)).run("Find ships")
+
+        self.assertEqual(
+            result.tool_events[0].summary,
+            {"queries": ["ships"], "source_count": 1},
+        )
+        self.assertGreaterEqual(result.tool_events[0].duration_ms, 0)
+        self.assertNotIn("evidence", str(result.tool_events[0].summary))
+
     def test_external_write_is_not_run_without_approval(self):
         called = []
         call = ToolCall(id="call-1", name="send_email", arguments="{}")

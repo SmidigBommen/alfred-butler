@@ -19,6 +19,84 @@ from alfred_tools.web.search import (
 )
 
 
+def _short(value: Any, limit: int = 300) -> str:
+    return str(value or "").strip()[:limit]
+
+
+def _source_summary(source: Any) -> dict[str, Any] | None:
+    if not isinstance(source, dict):
+        return None
+    url = _short(source.get("url"), 4_096)
+    if not url:
+        return None
+    search = source.get("search")
+    search_title = search.get("title") if isinstance(search, dict) else None
+    return {
+        "title": _short(source.get("title") or search_title),
+        "url": url,
+        "cached": bool(source.get("cached", False)),
+    }
+
+
+def _warning_summary(warning: Any) -> dict[str, str] | None:
+    if not isinstance(warning, dict):
+        return None
+    return {
+        key: _short(warning.get(key))
+        for key in ("stage", "query", "url", "engine", "type", "error")
+        if warning.get(key)
+    }
+
+
+def _failure(output: Any, status: str) -> str | None:
+    if status != "failed" or not isinstance(output, dict):
+        return None
+    return _short(output.get("message") or output.get("error")) or "tool failed"
+
+
+def _search_trace(arguments: dict[str, Any], output: Any, status: str) -> dict[str, Any]:
+    value = output if isinstance(output, dict) else {}
+    sources = [summary for item in value.get("results", []) if (summary := _source_summary(item))]
+    warnings = [
+        summary for item in value.get("warnings", []) if (summary := _warning_summary(item))
+    ]
+    return {
+        "query": _short(arguments.get("query"), 500),
+        "result_count": len(value.get("results", [])),
+        "cached": bool(value.get("cached", False)),
+        "sources": sources[:5],
+        "warnings": warnings[:8],
+        "error": _failure(output, status),
+    }
+
+
+def _fetch_trace(arguments: dict[str, Any], output: Any, status: str) -> dict[str, Any]:
+    value = output if isinstance(output, dict) else {}
+    source = _source_summary(value)
+    return {
+        "requested_url": _short(arguments.get("url"), 4_096),
+        "sources": [source] if source else [],
+        "cached": bool(value.get("cached", False)),
+        "error": _failure(output, status),
+    }
+
+
+def _research_trace(arguments: dict[str, Any], output: Any, status: str) -> dict[str, Any]:
+    value = output if isinstance(output, dict) else {}
+    sources = [summary for item in value.get("sources", []) if (summary := _source_summary(item))]
+    warnings = [
+        summary for item in value.get("warnings", []) if (summary := _warning_summary(item))
+    ]
+    queries = [_short(query, 500) for query in arguments.get("queries", [])]
+    return {
+        "queries": queries[:4],
+        "source_count": len(sources),
+        "sources": sources[:10],
+        "warnings": warnings[:8],
+        "error": _failure(output, status),
+    }
+
+
 def build_alfred_tools(*, notes: Any, search: Any, fetch: Any, research: Any) -> tuple[Tool, ...]:
     def memory_search(arguments: dict[str, Any]) -> dict[str, Any]:
         query = str(arguments["query"])
@@ -114,6 +192,7 @@ def build_alfred_tools(*, notes: Any, search: Any, fetch: Any, research: Any) ->
             },
             permission="network_read",
             handler=web_search,
+            trace_builder=_search_trace,
         ),
         Tool(
             name="web_fetch",
@@ -126,6 +205,7 @@ def build_alfred_tools(*, notes: Any, search: Any, fetch: Any, research: Any) ->
             },
             permission="network_read",
             handler=web_fetch,
+            trace_builder=_fetch_trace,
         ),
         Tool(
             name="web_research",
@@ -145,6 +225,7 @@ def build_alfred_tools(*, notes: Any, search: Any, fetch: Any, research: Any) ->
             },
             permission="network_read",
             handler=web_research,
+            trace_builder=_research_trace,
         ),
     )
 

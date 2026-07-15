@@ -22,7 +22,18 @@ class FakeFetchClient:
 
 class FakeResearchClient:
     def research(self, request):
-        return {"queries": list(request.queries), "sources": []}
+        return {
+            "queries": list(request.queries),
+            "sources": [
+                {
+                    "title": "Maritime Museum",
+                    "url": "https://example.com/ships",
+                    "cached": False,
+                    "text": "private evidence payload",
+                }
+            ],
+            "warnings": [],
+        }
 
 
 class AlfredToolTests(unittest.TestCase):
@@ -87,6 +98,24 @@ class AlfredToolTests(unittest.TestCase):
         request = search_client.requests[0]
         self.assertEqual(request.language, "en")
         self.assertEqual(request.limit, 5)
+
+    def test_web_research_trace_has_sources_but_not_fetched_page_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tools = build_alfred_tools(
+                notes=NoteStore(Path(directory)),
+                search=FakeSearchClient(),
+                fetch=FakeFetchClient(),
+                research=FakeResearchClient(),
+            )
+            research = next(tool for tool in tools if tool.name == "web_research")
+            arguments = {"queries": ["historic ships"]}
+            output = research.handler(arguments)
+            summary = research.trace_builder(arguments, output, "completed")
+
+        self.assertEqual(summary["queries"], ["historic ships"])
+        self.assertEqual(summary["source_count"], 1)
+        self.assertEqual(summary["sources"][0]["title"], "Maritime Museum")
+        self.assertNotIn("private evidence payload", str(summary))
 
 
 if __name__ == "__main__":

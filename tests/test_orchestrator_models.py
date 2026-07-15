@@ -1,7 +1,12 @@
 import unittest
+from unittest.mock import patch
 
 from alfred_tools.orchestrator.engine import Message, Tool, ToolCall
-from alfred_tools.orchestrator.models import ResponsesBackend
+from alfred_tools.orchestrator.models import (
+    ModelBackendError,
+    ResponsesBackend,
+    UrllibJSONTransport,
+)
 
 
 class RecordingTransport:
@@ -15,6 +20,19 @@ class RecordingTransport:
 
 
 class ResponsesBackendTests(unittest.TestCase):
+    def test_timeout_error_reports_the_configured_deadline(self):
+        with (
+            patch("urllib.request.urlopen", side_effect=TimeoutError("timed out")),
+            self.assertRaisesRegex(ModelBackendError, "timed out after 42 seconds"),
+        ):
+            UrllibJSONTransport().post_json(
+                "http://127.0.0.1:1234/v1/responses",
+                {},
+                {},
+                timeout=42,
+                max_response_bytes=1_000,
+            )
+
     def test_sends_non_stored_responses_request_and_parses_text(self):
         transport = RecordingTransport(
             {

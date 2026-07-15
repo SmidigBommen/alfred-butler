@@ -28,7 +28,12 @@ MAX_NORMALIZED_AUDIO_BYTES = 10_000_000
 MIN_NORMALIZED_AUDIO_BYTES = 8_000
 NORMALIZATION_TIMEOUT = 30.0
 NORMALIZED_AUDIO_SECONDS = 300
-VALID_VOICE = re.compile(r"[a-z0-9_-]{1,40}\Z")
+OPENAI_SPEECH_VOICE = "cedar"
+OPENAI_SPEECH_INSTRUCTIONS = (
+    "Speak in a warm, composed masculine voice with a natural modern British English accent, "
+    "medium-low pitch, measured pace, and understated delivery. Avoid an exaggerated theatrical "
+    "accent."
+)
 AUDIO_EXTENSIONS = {
     "audio/mp4": "m4a",
     "audio/mpeg": "mp3",
@@ -266,20 +271,18 @@ class OpenAISpeechSynthesizer:
         self.transport = transport or UrllibAudioTransport()
         self.timeout = timeout
 
-    def synthesize(self, text: str, *, voice: str) -> AudioResponse:
+    def synthesize(self, text: str) -> AudioResponse:
         text = text.strip()
         if not text or len(text) > MAX_SPEECH_INPUT_CHARS:
             raise ValueError(
                 f"speech text must contain between 1 and {MAX_SPEECH_INPUT_CHARS} characters"
             )
-        if not VALID_VOICE.fullmatch(voice):
-            raise ValueError("voice is invalid")
         body = json.dumps(
             {
                 "model": self.model,
-                "voice": voice,
+                "voice": OPENAI_SPEECH_VOICE,
                 "input": text,
-                "instructions": "Speak as a calm, concise English personal assistant.",
+                "instructions": OPENAI_SPEECH_INSTRUCTIONS,
                 "response_format": "wav",
             },
             ensure_ascii=False,

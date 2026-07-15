@@ -190,6 +190,20 @@ selectors. Local transcription and silent replies remain the defaults. Browser
 speech synthesis provides local spoken output. The browser hotkey is page-scoped;
 a native desktop helper is needed before it can be system-wide.
 
+Alfred replies render a deliberately limited Markdown subset: headings, tables,
+lists, block quotes, fenced and inline code, emphasis, rules, and HTTP(S) links.
+The server converts Markdown to an inert rendering tree and the browser creates
+DOM elements with text content; raw model HTML is never inserted into the page.
+Wide tables scroll horizontally on smaller screens. User messages and errors
+remain literal text.
+
+When a model uses tools, its reply includes a collapsed, ephemeral **Activity &
+sources** panel. Web entries show the exact queries, completion status, elapsed
+time, cache markers, warnings, and the candidate or fetched source URLs returned
+by Alfred. The panel never includes page bodies, model prompts, credentials, or
+private-memory contents, and it disappears with the browser session. Alfred also
+instructs models to cite exact tool-returned URLs rather than rewriting them.
+
 Local requests use LM Studio's Responses API at `http://127.0.0.1:1234/v1`. On
 the first request Alfred uses an already-loaded model. If there is none, it
 starts the server on loopback, selects the smallest installed model marked as
@@ -197,6 +211,10 @@ trained for tool use, and loads it as `alfred-local` with full GPU offload and a
 30-minute idle TTL. Alfred never downloads an LM Studio model. Set
 `ALFRED_LMSTUDIO_MODEL` to an installed model key to override automatic
 selection. `ALFRED_LMSTUDIO_URL` may change the port but must remain loopback.
+Local model responses allow 600 seconds by default because loading and warming a
+large model can exceed the remote API's shorter deadline. Set
+`ALFRED_LMSTUDIO_TIMEOUT` to a value from 1 through 3600 seconds to override it;
+this changes each model-response deadline, not the bounded number of tool rounds.
 
 English transcription uses `faster-whisper`. Its model defaults to the compact
 quantized `small.en` and is downloaded into the normal model cache on first use;
@@ -216,8 +234,11 @@ alfred-serve
 
 With `OPENAI_API_KEY` present, the microphone selector also offers explicit
 remote transcription using `gpt-4o-mini-transcribe`, and spoken replies offer
-OpenAI's `gpt-4o-mini-tts` with the `marin` voice. Override those defaults with
-`ALFRED_OPENAI_TRANSCRIBE_MODEL` and `ALFRED_OPENAI_TTS_MODEL`. Remote microphone
+OpenAI's `gpt-4o-mini-tts` with the Cedar voice and a natural, understated modern
+British English delivery. Cedar is the only remote output voice: the policy is
+owned by the server rather than selected by the browser. Override the model
+defaults with `ALFRED_OPENAI_TRANSCRIBE_MODEL` and `ALFRED_OPENAI_TTS_MODEL`.
+Remote microphone
 selection locally decodes the browser recording with FFmpeg, converts it to a
 16 kHz mono PCM WAV, and uploads that normalized recording to OpenAI. Temporary
 input and output files are deleted before the request continues. Remote spoken

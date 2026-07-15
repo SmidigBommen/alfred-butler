@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
@@ -48,6 +49,11 @@ class Tool:
     permission: Permission
     handler: Callable[[dict[str, Any]], Any] = field(repr=False, compare=False)
     remote_allowed: bool = True
+    trace_builder: Callable[[dict[str, Any], Any, str], dict[str, Any]] | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +61,8 @@ class ToolEvent:
     call_id: str
     name: str
     status: str
+    duration_ms: int = 0
+    summary: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +194,8 @@ class Orchestrator:
                 if tool_count > self.max_tool_calls:
                     raise OrchestrationLimitError("tool call limit exceeded")
                 tool = tools_by_name.get(call.name)
+                arguments: dict[str, Any] = {}
+                duration_ms = 0
                 if tool is None:
                     status = "unknown_tool"
                     output = {"error": status, "tool": call.name}
@@ -208,6 +218,7 @@ class Orchestrator:
                         status = "invalid_arguments"
                         output = {"error": status, "message": str(error)}
                     else:
+                        started_at = time.monotonic()
                         try:
                             output = tool.handler(arguments)
                             status = "completed"
@@ -218,7 +229,17 @@ class Orchestrator:
                                 "tool": call.name,
                                 "message": str(error),
                             }
-                events.append(ToolEvent(call.id, call.name, status))
+                        duration_ms = round((time.monotonic() - started_at) * 1_000)
+                summary: dict[str, Any] = {}
+                if tool is not None and tool.trace_builder is not None and arguments:
+                    try:
+                        candidate = tool.trace_builder(arguments, output, status)
+                        encoded = json.dumps(candidate, ensure_ascii=False, default=str)
+                        if isinstance(candidate, dict) and len(encoded) <= 20_000:
+                            summary = candidate
+                    except Exception:
+                        summary = {}
+                events.append(ToolEvent(call.id, call.name, status, duration_ms, summary))
                 messages.append(
                     Message(
                         role="tool",

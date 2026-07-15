@@ -18,9 +18,48 @@ button { cursor: pointer; }
 button:hover, button:focus-visible { border-color: #9eb693; background: #273129; }
 #talk.recording { color: #fff; background: #813e3e; border-color: #e58b7f; }
 #messages { overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
-article { max-width: 78%; white-space: pre-wrap; line-height: 1.55; padding: 12px 15px; border-radius: 12px; background: #202823; }
+article { max-width: 78%; line-height: 1.55; padding: 12px 15px; border-radius: 12px; background: #202823; }
+article.alfred { max-width: 94%; }
 article.user { align-self: end; background: #354334; }
+article.user, article.error { white-space: pre-wrap; }
 article.error { color: #ffd0c9; border: 1px solid #7d4540; }
+article.alfred > :first-child { margin-top: 0; }
+article.alfred > :last-child { margin-bottom: 0; }
+article.alfred p { margin: .65em 0; }
+article.alfred h2, article.alfred h3, article.alfred h4, article.alfred h5, article.alfred h6 { color: #f2f4ef; line-height: 1.25; margin: 1.1em 0 .45em; }
+article.alfred h2 { font-family: Georgia, serif; font-size: 1.45rem; font-weight: 500; border-bottom: 1px solid #3f4a42; padding-bottom: .3em; }
+article.alfred h3 { font-size: 1.1rem; }
+article.alfred ul, article.alfred ol { margin: .65em 0; padding-left: 1.6em; }
+article.alfred li + li { margin-top: .3em; }
+article.alfred blockquote { margin: .8em 0; padding: .25em 0 .25em 1em; border-left: 3px solid #7f9a78; color: #cbd5ca; }
+article.alfred a { color: #b7dba9; text-underline-offset: .18em; }
+article.alfred a:hover, article.alfred a:focus-visible { color: #e0f3d8; }
+article.alfred code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; padding: .12em .35em; border-radius: 4px; background: #141a16; }
+article.alfred pre { overflow-x: auto; padding: 12px; border: 1px solid #3e4841; border-radius: 8px; background: #141a16; }
+article.alfred pre code { padding: 0; background: transparent; white-space: pre; }
+article.alfred hr { border: 0; border-top: 1px solid #3f4a42; margin: 1.1em 0; }
+.markdown-table-scroll { max-width: 100%; overflow-x: auto; margin: .85em 0; border: 1px solid #465249; border-radius: 8px; }
+.markdown-table-scroll table { width: 100%; border-collapse: collapse; font-size: .94rem; }
+.markdown-table-scroll th, .markdown-table-scroll td { min-width: 8rem; padding: 9px 11px; border-right: 1px solid #3f4a42; border-bottom: 1px solid #3f4a42; vertical-align: top; }
+.markdown-table-scroll th { color: #dce8d8; background: #29332c; font-weight: 650; }
+.markdown-table-scroll tr:last-child td { border-bottom: 0; }
+.markdown-table-scroll th:last-child, .markdown-table-scroll td:last-child { border-right: 0; }
+.markdown-table-scroll tbody tr:nth-child(even) { background: #1b221e; }
+.markdown-table-scroll .align-center { text-align: center; }
+.markdown-table-scroll .align-right { text-align: right; }
+.activity { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid #3f4a42; color: #c8d1c7; font-size: .88rem; }
+.activity > summary { cursor: pointer; color: #b7cdb0; font-weight: 650; user-select: none; }
+.activity[open] > summary { margin-bottom: .7rem; }
+.tool-event { padding: .75rem 0; border-top: 1px solid #343e37; }
+.tool-event:first-of-type { border-top: 0; }
+.tool-event-heading { display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; }
+.tool-status { padding: .08rem .4rem; border: 1px solid #4f6652; border-radius: 999px; color: #bde0b8; font-size: .75rem; }
+.status-failed .tool-status, .status-invalid_arguments .tool-status { border-color: #81504a; color: #ffc5bc; }
+.tool-duration { margin-left: auto; color: #929e94; font-variant-numeric: tabular-nums; }
+.activity-label { margin: .65rem 0 .15rem !important; color: #98a59a; font-size: .76rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.activity ul { margin: .2rem 0 .4rem !important; padding-left: 1.35rem !important; }
+.activity li + li { margin-top: .2rem !important; }
+.activity .warning-label, .activity-error { color: #e4b1a8; }
 #status, footer { color: #abb4ac; font-size: .84rem; }
 footer { justify-content: space-between; }
 .voice-settings { display: flex; align-items: center; gap: 12px; }

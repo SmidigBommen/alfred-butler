@@ -64,6 +64,8 @@ class UrllibJSONTransport:
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 data = response.read(max_response_bytes + 1)
+        except TimeoutError as error:
+            raise ModelBackendError(f"model request timed out after {timeout:g} seconds") from error
         except (OSError, urllib.error.HTTPError, urllib.error.URLError) as error:
             raise ModelBackendError(f"model request failed: {error}") from error
         if len(data) > max_response_bytes:

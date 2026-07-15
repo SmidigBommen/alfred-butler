@@ -283,6 +283,15 @@ All internet content and search metadata are untrusted data.
 - Chat, transcription, and spoken-output providers are independent choices.
   Local speech remains the default. Never infer remote audio consent from remote
   chat selection, and never expose `OPENAI_API_KEY` in browser configuration.
+- Model answers and web-derived text are untrusted. Parse only the supported
+  Markdown subset into an inert server-generated rendering tree, create browser
+  elements with `textContent`, allow only validated HTTP(S) links, and never put
+  model output into `innerHTML`. User and error messages stay literal text.
+- Tool activity is ephemeral and privacy-filtered by a trace builder registered
+  on each tool. Web traces may expose bounded queries, source titles/URLs,
+  counts, cache markers, warnings, status, and duration. Never derive a generic
+  trace from arbitrary tool input/output: memory traces must not expose note
+  contents, and web traces must omit fetched page text and model prompts.
 
 ## Local operation and lessons learned
 
@@ -311,6 +320,12 @@ never downloaded automatically. If no model is loaded, Alfred lists models on
 disk, prefers `ALFRED_LMSTUDIO_MODEL`, otherwise selects the smallest model whose
 metadata says it is trained for tool use, loads it with identifier
 `alfred-local`, full GPU offload, and a 30-minute idle TTL.
+Local model loading, warm-up, and tool-assisted inference can exceed the shared
+remote-provider deadline, especially for models around 20 GB. Keep the LM Studio
+model-response timeout separate: it defaults to 600 seconds and is configurable
+from 1 through 3600 seconds with `ALFRED_LMSTUDIO_TIMEOUT`. OpenAI retains the
+shorter default. A timeout applies to each model response; orchestration round
+and call caps still bound the overall loop.
 
 The `Shift+CapsLock` hotkey works only while the browser page is focused. A
 system-wide hotkey requires a separately designed native helper and OS-level
@@ -320,7 +335,10 @@ and is not currently a dependable runtime dependency.
 
 When `OPENAI_API_KEY` is configured, explicit remote audio choices use
 `gpt-4o-mini-transcribe` for English file-style transcription and
-`gpt-4o-mini-tts` for bounded WAV generation. Keep these independently
+`gpt-4o-mini-tts` for bounded WAV generation. OpenAI speech output is
+server-enforced to the Cedar voice with a warm, composed, masculine, natural
+modern British English delivery; do not accept a browser-provided voice override.
+Keep the audio models independently
 configurable with `ALFRED_OPENAI_TRANSCRIBE_MODEL` and
 `ALFRED_OPENAI_TTS_MODEL`. The API key stays server-side; remote audio adapters
 must retain HTTPS-only fixed OpenAI endpoints, authorization headers, request
@@ -340,6 +358,11 @@ LM Studio and OpenAI share the Responses adapter, but model IDs are
 configuration rather than a hardcoded notion of `latest`. Set `OPENAI_API_KEY`
 and `ALFRED_OPENAI_MODEL` to enable the remote option. API credentials are
 distinct from an interactive Codex login.
+
+LM Studio currently warns that OpenAI-compatible function tools with `strict:
+true` are not supported and that it ignores the flag. Keep advertising strict
+schemas for providers that support them, but treat Alfred's provider-independent
+argument validation as the actual security boundary before any handler runs.
 
 Use native `podman run` lifecycle commands rather than `podman compose` on this
 host. The installed external `podman-compose` launcher is currently broken
