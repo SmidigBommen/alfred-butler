@@ -1,0 +1,7 @@
+# Proxy identity is still initialized by SearXNG when rate limiting is disabled.
+# Alfred connects directly from loopback, so only loopback is trusted.
+[botdetection]
+trusted_proxies = [
+  "127.0.0.0/8",
+  "::1",
+]

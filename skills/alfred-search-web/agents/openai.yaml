@@ -1,0 +1,6 @@
+interface:
+  display_name: "Alfred Web"
+  short_description: "Search, fetch, and research the live web"
+  default_prompt: "Use $alfred-search-web to gather current web evidence and answer my question with direct citations."
+policy:
+  allow_implicit_invocation: true
