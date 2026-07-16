@@ -386,6 +386,23 @@ make install-voice
 make serve
 ```
 
+This host keeps OpenAI configuration as unexported assignments in the private
+`~/.config/alfred/secrets.env` file. Sourcing that file alone is insufficient:
+`alfred-serve` is a child process and will not inherit unexported shell variables.
+For a manual restart, enable auto-export while loading the file:
+
+```bash
+set -a
+source ~/.config/alfred/secrets.env
+set +a
+exec alfred-serve
+```
+
+After every restart that should expose OpenAI features, query the loopback
+`/api/config` endpoint and verify `remote` chat, `openai` microphone input, and
+`openai` spoken output are present. Do not treat a listening socket alone as a
+successful restart. Never print or log the secret values while checking them.
+
 `make install-agent` remains the lightweight text/tool installation;
 `make install-voice` adds `faster-whisper`. Its default model weights are fetched
 on first transcription and cached outside the repository. The compact quantized
