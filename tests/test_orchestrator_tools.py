@@ -21,7 +21,11 @@ class FakeFetchClient:
 
 
 class FakeResearchClient:
+    def __init__(self):
+        self.requests = []
+
     def research(self, request):
+        self.requests.append(request)
         return {
             "queries": list(request.queries),
             "sources": [
@@ -136,12 +140,13 @@ class AlfredToolTests(unittest.TestCase):
         self.assertEqual(request.limit, 5)
 
     def test_web_research_trace_has_sources_but_not_fetched_page_text(self):
+        research_client = FakeResearchClient()
         with tempfile.TemporaryDirectory() as directory:
             tools = build_alfred_tools(
                 notes=NoteStore(Path(directory)),
                 search=FakeSearchClient(),
                 fetch=FakeFetchClient(),
-                research=FakeResearchClient(),
+                research=research_client,
                 weather=FakeWeatherClient(),
             )
             research = next(tool for tool in tools if tool.name == "web_research")
@@ -153,6 +158,8 @@ class AlfredToolTests(unittest.TestCase):
         self.assertEqual(summary["source_count"], 1)
         self.assertEqual(summary["sources"][0]["title"], "Maritime Museum")
         self.assertNotIn("private evidence payload", str(summary))
+        self.assertEqual(research_client.requests[0].max_sources, 4)
+        self.assertEqual(research_client.requests[0].max_chars_per_source, 4_000)
 
     def test_weather_forecast_is_bounded_and_has_attributed_trace(self):
         weather_client = FakeWeatherClient()

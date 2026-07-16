@@ -1,9 +1,13 @@
+import io
+import json
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 from alfred_tools.orchestrator.engine import Message, Tool, ToolCall
 from alfred_tools.orchestrator.models import (
     ModelBackendError,
+    ModelContextError,
     ResponsesBackend,
     UrllibJSONTransport,
 )
@@ -20,6 +24,34 @@ class RecordingTransport:
 
 
 class ResponsesBackendTests(unittest.TestCase):
+    def test_context_overflow_returns_a_clear_recovery_error(self):
+        payload = {
+            "error": {
+                "message": (
+                    "Engine protocol predict request returned 400: "
+                    "exceeded_context_size_error; request exceeds available context size"
+                )
+            }
+        }
+        response = urllib.error.HTTPError(
+            "http://127.0.0.1:1234/v1/responses",
+            500,
+            "Internal Server Error",
+            {},
+            io.BytesIO(json.dumps(payload).encode()),
+        )
+        with (
+            patch("urllib.request.urlopen", side_effect=response),
+            self.assertRaisesRegex(ModelContextError, "context is full.*New conversation"),
+        ):
+            UrllibJSONTransport().post_json(
+                "http://127.0.0.1:1234/v1/responses",
+                {},
+                {},
+                timeout=42,
+                max_response_bytes=1_000,
+            )
+
     def test_timeout_error_reports_the_configured_deadline(self):
         with (
             patch("urllib.request.urlopen", side_effect=TimeoutError("timed out")),

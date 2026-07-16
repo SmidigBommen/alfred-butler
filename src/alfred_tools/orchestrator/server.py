@@ -32,6 +32,7 @@ from alfred_tools.orchestrator.tools import default_alfred_tools
 MAX_JSON_BYTES = 100_000
 MAX_AUDIO_BYTES = 12_000_000
 MAX_MESSAGE_CHARS = 20_000
+DEFAULT_MAX_SESSION_HISTORY_CHARS = 12_000
 DEFAULT_LOCAL_MODEL_TIMEOUT = 600.0
 MAX_LOCAL_MODEL_TIMEOUT = 3_600.0
 SESSION_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,80}\Z")
@@ -64,12 +65,59 @@ class _Session:
     touched_at: float
 
 
+def _message_chars(message: Message) -> int:
+    return len(message.content)
+
+
+def _compact_session_messages(
+    messages: tuple[Message, ...], *, max_chars: int
+) -> tuple[Message, ...]:
+    """Retain bounded conversational turns, never raw tool evidence."""
+    system = next((message for message in messages if message.role == "system"), None)
+    turns: list[list[Message]] = []
+    current: list[Message] = []
+    for message in messages:
+        if message.role in {"system", "tool"}:
+            continue
+        if message.role == "assistant" and message.tool_calls:
+            continue
+        if message.role == "user":
+            if current:
+                turns.append(current)
+            current = [message]
+        elif current:
+            current.append(message)
+    if current:
+        turns.append(current)
+
+    retained: list[list[Message]] = []
+    used = _message_chars(system) if system is not None else 0
+    for turn in reversed(turns):
+        turn_chars = sum(_message_chars(message) for message in turn)
+        if used + turn_chars > max_chars:
+            break
+        retained.append(turn)
+        used += turn_chars
+
+    compacted: list[Message] = [system] if system is not None else []
+    for turn in reversed(retained):
+        compacted.extend(turn)
+    return tuple(compacted)
+
+
 class EphemeralSessions:
-    def __init__(self, *, ttl_seconds: float = 3600, max_sessions: int = 32):
-        if ttl_seconds <= 0 or max_sessions < 1:
+    def __init__(
+        self,
+        *,
+        ttl_seconds: float = 3600,
+        max_sessions: int = 32,
+        max_history_chars: int = DEFAULT_MAX_SESSION_HISTORY_CHARS,
+    ):
+        if ttl_seconds <= 0 or max_sessions < 1 or max_history_chars < 100:
             raise ValueError("session bounds must be positive")
         self.ttl_seconds = ttl_seconds
         self.max_sessions = max_sessions
+        self.max_history_chars = max_history_chars
         self._sessions: dict[str, _Session] = {}
         self._lock = threading.Lock()
 
@@ -94,13 +142,14 @@ class EphemeralSessions:
             return session.messages
 
     def save(self, session_id: str, backend: str, messages: tuple[Message, ...]) -> None:
-        if len(messages) > 200:
+        compacted = _compact_session_messages(messages, max_chars=self.max_history_chars)
+        if len(compacted) > 200:
             raise SessionConflictError("session is full; start a new session")
         with self._lock:
             session = self._sessions.get(session_id)
             if session is None or session.backend != backend:
                 raise SessionConflictError("session provider changed while processing")
-            session.messages = messages
+            session.messages = compacted
             session.touched_at = time.monotonic()
 
     def _discard_expired(self, now: float) -> None:

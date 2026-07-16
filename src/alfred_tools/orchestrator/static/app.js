@@ -4,6 +4,7 @@ const input = document.querySelector("#message");
 const backend = document.querySelector("#backend");
 const statusLine = document.querySelector("#status");
 const talk = document.querySelector("#talk");
+const newSession = document.querySelector("#new-session");
 const transcriptionProvider = document.querySelector("#transcription-provider");
 const speechOutput = document.querySelector("#speech-output");
 
@@ -241,6 +242,7 @@ function addMessage(text, kind, blocks = null) {
 function setBusy(busy, text = "") {
   input.disabled = busy;
   document.querySelector("#send").disabled = busy;
+  newSession.disabled = busy;
   statusLine.textContent = text || "Text stays in memory and is discarded with this session.";
 }
 
@@ -334,11 +336,15 @@ form.addEventListener("submit", (event) => {
   sendMessage(text);
 });
 
-backend.addEventListener("change", () => {
+function resetSession() {
   sessionId = crypto.randomUUID();
   messages.replaceChildren();
   addMessage(`New ${backend.value} session. Previous context was discarded.`, "alfred");
-});
+  input.focus();
+}
+
+backend.addEventListener("change", resetSession);
+newSession.addEventListener("click", resetSession);
 
 async function startRecording() {
   recordingRequested = true;

@@ -19,6 +19,30 @@ class ModelBackendError(RuntimeError):
     """Raised when a model provider cannot return a valid response."""
 
 
+class ModelContextError(ModelBackendError):
+    """Raised when a model provider rejects an oversized prompt."""
+
+
+def _http_error_detail(error: urllib.error.HTTPError, *, max_bytes: int) -> str:
+    try:
+        data = error.read(max_bytes + 1)
+    except OSError:
+        return ""
+    finally:
+        error.close()
+    if len(data) > max_bytes:
+        return ""
+    try:
+        value = json.loads(data)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return data.decode("utf-8", errors="replace")[:2_000]
+    if isinstance(value, dict):
+        detail = value.get("error")
+        if isinstance(detail, dict) and isinstance(detail.get("message"), str):
+            return detail["message"][:2_000]
+    return ""
+
+
 def _is_loopback(hostname: str | None) -> bool:
     if hostname is None:
         return False
@@ -66,7 +90,18 @@ class UrllibJSONTransport:
                 data = response.read(max_response_bytes + 1)
         except TimeoutError as error:
             raise ModelBackendError(f"model request timed out after {timeout:g} seconds") from error
-        except (OSError, urllib.error.HTTPError, urllib.error.URLError) as error:
+        except urllib.error.HTTPError as error:
+            detail = _http_error_detail(error, max_bytes=max_response_bytes)
+            normalized = detail.casefold()
+            if "exceeded_context_size_error" in normalized or (
+                "exceeds" in normalized and "context size" in normalized
+            ):
+                raise ModelContextError(
+                    "model context is full; use New conversation and try again"
+                ) from error
+            suffix = f": {detail}" if detail else ""
+            raise ModelBackendError(f"model request failed: HTTP {error.code}{suffix}") from error
+        except (OSError, urllib.error.URLError) as error:
             raise ModelBackendError(f"model request failed: {error}") from error
         if len(data) > max_response_bytes:
             raise ModelBackendError("model response exceeded the configured size limit")

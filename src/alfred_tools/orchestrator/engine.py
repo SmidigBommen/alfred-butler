@@ -141,7 +141,7 @@ class Orchestrator:
         max_tool_rounds: int = 6,
         max_tool_calls: int = 12,
         max_tool_argument_chars: int = 20_000,
-        max_tool_output_chars: int = 50_000,
+        max_tool_output_chars: int = 24_000,
         approved_permissions: frozenset[Permission] = AUTOMATIC_PERMISSIONS,
     ):
         if (

@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from alfred_tools.orchestrator.engine import ModelReply, Tool, ToolCall
+from alfred_tools.orchestrator.engine import Message, ModelReply, Tool, ToolCall
 from alfred_tools.orchestrator.server import (
     SYSTEM_PROMPT,
     ChatService,
@@ -33,6 +33,21 @@ class OneToolModel:
                 )
             )
         return ModelReply(text="Research complete.")
+
+
+class SessionHistoryModel:
+    def __init__(self):
+        self.requests = []
+
+    def complete(self, messages, tools):
+        self.requests.append(messages)
+        if messages[-1].role == "tool":
+            return ModelReply(text="Games found: https://example.com/games")
+        if messages[-1].content == "Find games":
+            return ModelReply(
+                tool_calls=(ToolCall("research-history", "web_research", '{"queries":[]}'),)
+            )
+        return ModelReply(text="The previous answer remains available.")
 
 
 class FakeTranscriber:
@@ -188,12 +203,52 @@ class OrchestratorServerTests(unittest.TestCase):
         )
         self.assertNotIn("full evidence", str(result["tools"]))
 
+    def test_session_history_discards_raw_tool_evidence_after_the_turn(self):
+        model = SessionHistoryModel()
+        tool = Tool(
+            name="web_research",
+            description="Research",
+            input_schema={"type": "object"},
+            permission="network_read",
+            handler=lambda arguments: {"text": "raw fetched evidence"},
+        )
+        service = ChatService(backends={"local": model}, tools=(tool,))
+
+        service.chat({"session_id": "compact", "backend": "local", "message": "Find games"})
+        service.chat({"session_id": "compact", "backend": "local", "message": "And next week?"})
+
+        later_request = model.requests[-1]
+        self.assertNotIn("raw fetched evidence", str(later_request))
+        self.assertNotIn("tool", [message.role for message in later_request])
+        self.assertIn("Games found: https://example.com/games", str(later_request))
+
+    def test_session_history_drops_oldest_complete_turns_to_fit_budget(self):
+        sessions = EphemeralSessions(max_history_chars=220)
+        sessions.history("bounded", "local")
+        messages = [Message("system", "Be Alfred.")]
+        for number in range(5):
+            messages.extend(
+                (
+                    Message("user", f"question-{number}-" + "q" * 40),
+                    Message("assistant", f"answer-{number}-" + "a" * 40),
+                )
+            )
+
+        sessions.save("bounded", "local", tuple(messages))
+        history = sessions.history("bounded", "local")
+
+        serialized = " ".join(message.content for message in history)
+        self.assertNotIn("question-0", serialized)
+        self.assertIn("question-4", serialized)
+        self.assertLessEqual(sum(len(message.content) for message in history), 220)
+
     def test_rejects_non_loopback_binding(self):
         service = ChatService(backends={"local": EchoModel()}, tools=())
         with self.assertRaisesRegex(ValueError, "loopback"):
             create_server("0.0.0.0", 8123, service)
 
     def test_interface_implements_the_requested_push_to_talk_chord(self):
+        page = (ROOT / "src/alfred_tools/orchestrator/static/index.html").read_text()
         script = (ROOT / "src/alfred_tools/orchestrator/static/app.js").read_text()
         self.assertIn('event.code === "CapsLock" && event.shiftKey', script)
         self.assertIn("MediaRecorder", script)
@@ -209,6 +264,8 @@ class OrchestratorServerTests(unittest.TestCase):
         self.assertIn("answer_blocks", script)
         self.assertIn("Activity & sources", script)
         self.assertIn("result.tools", script)
+        self.assertIn('id="new-session"', page)
+        self.assertIn('newSession.addEventListener("click"', script)
         self.assertNotIn("innerHTML", script)
         self.assertNotIn("localStorage", script)
 

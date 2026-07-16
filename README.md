@@ -318,8 +318,15 @@ Switching providers starts a new session, so local conversation context cannot
 be sent remotely by accident. Remote models are not offered personal-memory
 tools, so they cannot retrieve or write private notes. Requests use `store:
 false`; session messages live only in bounded process memory, expire after one
-hour, and disappear when Alfred stops. Only a local `memory_capture` tool call
-creates a durable note, retaining the sensitive-content and credential gates.
+hour, and disappear when Alfred stops. The **New conversation** button resets
+context immediately without changing providers. Raw fetched evidence and other
+tool outputs exist only while composing the current answer; retained history
+contains ordinary user and final-assistant messages, is capped at 12,000
+characters, and drops the oldest complete turns first. Chat research fetches at
+most 4,000 characters from each of four sources. If a provider still rejects a
+prompt as too large, Alfred reports that its context is full and directs the user
+to start a new conversation. Only a local `memory_capture` tool call creates a
+durable note, retaining the sensitive-content and credential gates.
 Audio requests and generated WAV responses are size- and time-bounded. Alfred
 does not retain remote recordings, transcripts, or generated speech. Audio
 normalization uses a private temporary directory and removes it on success or

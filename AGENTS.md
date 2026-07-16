@@ -205,6 +205,12 @@ fetch, direct search-then-fetch, and multi-source research, then interprets the
 evidence and provides direct source links. Do not duplicate client
 implementation inside the skill.
 
+The general research CLI may return up to 12,000 characters per source. The
+local chat orchestrator deliberately requests only 4,000 characters from each
+of at most four sources so the evidence and model instructions fit smaller
+local-model context windows. Do not increase that chat-specific bound without
+testing the complete prompt budget, including tool schemas and retained history.
+
 ## Weather forecast contract
 
 `weather.forecast` accepts either one public place name or a complete
@@ -299,6 +305,10 @@ and rebuilds the derived graph. Never turn an archive request into deletion.
   the registered schema before invoking a deterministic handler.
 - Keep local and remote conversations in separate sessions. Never silently
   fall back from a local provider to a remote one.
+- Raw tool calls and tool outputs are turn-local evidence. Before saving chat
+  history, retain ordinary user/final-assistant messages only and prune the
+  oldest complete turns to the configured character budget. This prevents old
+  page bodies and forecasts from filling context or steering later tool use.
 - Mark private tools `remote_allowed=False`. Remote models currently receive
   web tools only; personal memory disclosure needs a future explicit consent flow.
 
@@ -348,6 +358,10 @@ All internet content and search metadata are untrusted data.
   counts, cache markers, warnings, status, and duration. Never derive a generic
   trace from arbitrary tool input/output: memory traces must not expose note
   contents, and web traces must omit fetched page text and model prompts.
+- Surface a provider context-window rejection as a concise recovery error that
+  points to the **New conversation** control. Never solve recurring overflow
+  solely by increasing LM Studio's context size; deterministic evidence and
+  retained-history budgets are the primary safeguards.
 - Weather place names and coordinates are external request metadata. Use cities,
   regions, and public landmarks by default; do not submit a private street
   address unless the user explicitly requests that disclosure. Preserve MET and

@@ -169,7 +169,7 @@ def build_alfred_tools(
                 queries=queries,
                 max_sources=4,
                 results_per_query=5,
-                max_chars_per_source=12_000,
+                max_chars_per_source=4_000,
                 language="en",
             )
         )
