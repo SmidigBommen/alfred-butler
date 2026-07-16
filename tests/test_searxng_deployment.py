@@ -13,6 +13,12 @@ class SearxngDeploymentTests(unittest.TestCase):
         self.assertRegex(settings, r"(?m)^\s+- json$")
         self.assertRegex(settings, r"(?m)^\s+limiter: false$")
 
+    def test_persistently_rate_limited_engines_are_disabled(self):
+        settings = (ROOT / "infra" / "searxng" / "settings.yml").read_text()
+
+        self.assertIn("  - name: brave\n    disabled: true", settings)
+        self.assertIn("  - name: google cse\n    disabled: true", settings)
+
     def test_proxy_configuration_is_explicitly_mounted(self):
         limiter = (ROOT / "infra" / "searxng" / "limiter.toml").read_text()
         makefile = (ROOT / "Makefile").read_text()

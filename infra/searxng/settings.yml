@@ -13,6 +13,15 @@ search:
     - html
     - json
 
+# These providers repeatedly rate-limit this host and add latency and duplicate
+# warnings without contributing useful results. Keep the overrides explicit so
+# inheriting a new upstream default configuration does not re-enable them.
+engines:
+  - name: brave
+    disabled: true
+  - name: google cse
+    disabled: true
+
 server:
   limiter: false
   public_instance: false

@@ -449,11 +449,18 @@ is disabled. Mount `limiter.toml`, identify direct loopback requests with
 `X-Real-IP`, and include the same header in health checks to avoid misleading
 proxy warnings.
 
-Individual upstream engines can fail independently. During initial validation,
-Brave rate-limited the host and Wikidata returned HTTP 403 during initialization;
-DuckDuckGo, Startpage, and Google CSE still returned useful results. Treat such
-failures as observable degraded service, not a total search failure. Avoid
-permanently disabling a provider based on one transient incident without data.
+Individual upstream engines can fail independently. Treat such failures as
+observable degraded service, not a total search failure. Avoid permanently
+disabling a provider based on one transient incident without data. Brave and
+Google CSE are explicit exceptions on this host: logs collected across many
+searches showed persistent rate limiting and repeated suspensions, so both are
+disabled in `settings.yml`. Re-enable either only after a deliberate live test
+shows that it contributes useful results without recurring warnings.
+
+A page fetch returning HTTP 403 is distinct from a search-engine failure. It
+usually means that the selected site rejects automated retrieval. Keep that
+warning visible and let research continue with replacement candidates; changing
+the SearXNG engine list cannot make the page fetchable.
 
 Use the `general` category for broad technical web research. The `it` category
 targets specialist engines such as MDN and Hoogle and can miss ordinary project
