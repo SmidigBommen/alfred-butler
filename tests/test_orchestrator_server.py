@@ -80,13 +80,13 @@ class OrchestratorServerTests(unittest.TestCase):
         self.assertEqual(result["answer_blocks"][0]["type"], "paragraph")
         self.assertEqual(result["session_id"], "session-one")
 
-    def test_system_prompt_uses_the_requested_terse_practical_butler_persona(self):
-        self.assertIn("tersely by default", SYSTEM_PROMPT)
+    def test_system_prompt_uses_a_brief_direct_butler_voice(self):
+        self.assertIn("Be brief unless the user asks for detail", SYSTEM_PROMPT)
+        self.assertIn("plain, direct language", SYSTEM_PROMPT)
         self.assertIn("British butler", SYSTEM_PROMPT)
-        self.assertIn("practical applications", SYSTEM_PROMPT)
-        self.assertIn("concrete next actions", SYSTEM_PROMPT)
-        self.assertIn("when the user asks for detail", SYSTEM_PROMPT)
-        self.assertIn("without theatrical affectation", SYSTEM_PROMPT)
+        self.assertIn("clear recommendation", SYSTEM_PROMPT)
+        self.assertIn("never theatrical", SYSTEM_PROMPT)
+        self.assertNotIn("materially", SYSTEM_PROMPT)
 
     def test_does_not_allow_a_session_to_switch_from_local_to_remote(self):
         self.service.chat({"session_id": "private", "backend": "local", "message": "local context"})
@@ -266,6 +266,11 @@ class OrchestratorServerTests(unittest.TestCase):
         self.assertIn("result.tools", script)
         self.assertIn('id="new-session"', page)
         self.assertIn('newSession.addEventListener("click"', script)
+        self.assertIn("What can I help with?", page)
+        self.assertIn("This process keeps conversation history until the session ends.", page)
+        self.assertIn(
+            "Local model is working. The first response can take several minutes.", script
+        )
         self.assertNotIn("innerHTML", script)
         self.assertNotIn("localStorage", script)
 

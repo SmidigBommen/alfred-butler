@@ -1,10 +1,11 @@
 # Alfred the Butler
 
-Alfred is a collection of local, deterministic tools that an AI assistant can
-compose when a task needs reasoning. Routine work stays in code so it is fast,
-repeatable, testable, and inexpensive.
+Alfred is a set of small command-line tools for web research, weather, personal
+notes, and a localhost chat interface. Each tool has a bounded JSON contract and
+can be tested without a model. The model decides when to call a tool and turns
+the result into an answer.
 
-The first tool family is private web evidence collection:
+Web research follows three separate steps:
 
 ```text
 search -> localhost SearXNG -> candidate URLs
@@ -44,10 +45,9 @@ This installs the repository as an editable `uv` tool, exposing `alfred-notes`,
 installation so skill discovery can load them. Re-run `make install-agent`
 after changing skill instructions.
 
-The skill chooses the smallest useful workflow: fetch a supplied page, search
-and verify a direct fact, or collect a diverse evidence bundle for a broader
-research question. Alfred then synthesizes the untrusted evidence into a concise
-answer with direct links.
+The web skill fetches a supplied page, searches for one authoritative source, or
+collects several sources for a broader question. Alfred treats the result as
+untrusted evidence and answers with direct links.
 
 ## Start the search service
 
@@ -99,20 +99,19 @@ alfred-web-fetch \
   --max-chars 12000
 ```
 
-Fetch returns normalized JSON containing the final URL, metadata, compact text,
-redirect history, retrieval time, truncation state, and a SHA-256 hash of the
-response body. Identical requests are cached for one hour in
+Fetch returns normalized JSON with the final URL, page metadata, extracted text,
+redirect history, retrieval time, truncation state, and a SHA-256 body hash.
+Identical requests are cached for one hour in
 `.cache/alfred/fetch.sqlite3`; use `--no-cache` or `ALFRED_FETCH_CACHE` as with
 search.
 
-The fetcher accepts public HTTP(S) pages containing HTML, plain text, XHTML, or
-JSON. It resolves and validates every destination, pins the connection to a
-validated public IP, revalidates every redirect, verifies HTTPS certificates,
-and bounds redirects, bytes, characters, and time. Private, loopback,
-link-local, reserved, and mixed public/private DNS answers are rejected.
-Unsupported content types and compressed responses are also rejected rather
-than expanded. Exit code `3` identifies a safety-policy rejection; input and
-backend errors retain exit codes `1` and `2`.
+The fetcher accepts HTML, plain text, XHTML, and JSON from public HTTP(S) URLs.
+It checks every resolved address, connects to a checked public IP, and repeats
+the check after each redirect. It also verifies HTTPS certificates and limits
+redirects, bytes, extracted characters, and time. It rejects private, loopback,
+link-local, reserved, and mixed public/private DNS answers. It also rejects
+unsupported content types and compressed responses. Exit code `3` means the URL
+or response failed a safety check. Input and backend errors use `1` and `2`.
 
 ## Research
 
@@ -124,12 +123,11 @@ alfred-web-research \
   --max-chars-per-source 12000
 ```
 
-Research is a deterministic orchestration layer, not a second AI. It searches
-up to eight focused queries, combines duplicate URLs, ranks candidates,
-diversifies domains, safely fetches bounded evidence, skips short or recognizable
-challenge pages, and records partial search/fetch failures as warnings. Its JSON
-bundle remains marked `untrusted`; Alfred supplies the judgment, comparison,
-synthesis, and citations.
+Research is deterministic code, not a second AI. It accepts up to eight focused
+queries, merges duplicate URLs, ranks candidates, and spreads results across
+domains. It fetches through Alfred's URL guard, skips short evidence and known
+challenge pages, and records partial failures as warnings. The JSON remains
+marked `untrusted`; Alfred compares the sources and writes the cited answer.
 
 ## Weather forecast
 
@@ -137,14 +135,13 @@ synthesis, and citations.
 alfred-weather --location "Oslo" --days 5 --hours 24
 ```
 
-The command resolves a city, region, or named public place through OpenStreetMap
-Nominatim, rounds its coordinates to four decimals, and requests the compact
-Locationforecast forecast from MET Norway. Supplying `--latitude` and
-`--longitude` together bypasses place lookup. Output is bounded normalized JSON
-with current conditions, up to 48 hourly entries, up to nine daily summaries,
-the applied IANA time zone, cache state, and explicit provider and license
-attribution. Input errors use exit code `1`; place-lookup and forecast failures
-use exit code `2`.
+The command resolves a city, region, or public landmark through OpenStreetMap
+Nominatim. It rounds the coordinates to four decimals and asks MET Norway for a
+compact Locationforecast forecast. Supplying `--latitude` and `--longitude`
+together skips place lookup. The normalized JSON contains current conditions,
+up to 48 hourly entries, up to nine daily summaries, the applied IANA time zone,
+cache state, and provider attribution. Input errors use exit code `1`.
+Place-lookup and forecast failures use `2`.
 
 Named places are cached for 30 days. Forecasts are cached until MET Norway's
 `Expires` time and revalidated with `If-Modified-Since`. Alfred identifies itself
@@ -171,7 +168,7 @@ ALFRED_WEATHER_LOCATION=Municipality, Country
 offsets are applied by the standard timezone database. If no location flag is
 given, `ALFRED_WEATHER_LOCATION` supplies the private default. Process environment
 variables override the file. Alfred parses only these allowlisted preference
-keys as inert data—it never sources or executes the file. Do not commit it.
+keys as inert data. It never sources or executes the file. Do not commit it.
 
 Weather data is provided by [MET Norway](https://api.met.no/) under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Named-place lookup is
@@ -220,18 +217,18 @@ encryption. Use `show`, `update --accept`, `link`, `archive`, `export`, and
 
 ## Local assistant interface
 
-Alfred's handler composes the deterministic memory, web, and weather tools
-through a bounded model tool-calling loop. The model receives only registered
-JSON tools; there is no shell tool. The browser interface is bound to localhost
-and supports ordinary text plus English push-to-talk.
+Alfred's chat handler gives the model a fixed list of memory, web, and weather
+tools. It validates every call and limits the number of calls and rounds. The
+model has no shell tool. The browser binds to localhost and supports text plus
+English push-to-talk.
 
-The server owns one provider-independent system prompt for both LM Studio and
-OpenAI chat. Alfred responds tersely by default in a composed, discreet,
-understated British-butler persona and prioritizes practical applications,
-concrete next actions, and materially useful caveats. Explicit requests for
-detail, safety, and correctness take precedence over brevity. This conversational
-persona is separate from the Cedar speech voice and does not weaken tool,
-privacy, source, or approval rules.
+LM Studio and OpenAI chat receive the same server-owned system prompt. It asks
+Alfred to write short, plain answers and to give a clear recommendation when the
+evidence supports one. The voice is that of a good British butler: calm,
+discreet, courteous, and never theatrical. Requests for detail, safety, and
+correctness take priority over brevity. This chat voice is separate from the
+Cedar speech voice and changes none of the tool, privacy, source, or approval
+rules.
 
 Install the interface with local speech support and start it with:
 
@@ -240,11 +237,10 @@ make install-voice
 make serve
 ```
 
-`make install-voice` records local speech as an enabled capability in
+`make install-voice` records that local speech is enabled in
 `~/.config/alfred/voice.enabled`. Subsequent `make install-agent` updates detect
-that marker and preserve the `voice` extra instead of silently replacing the
-tool with its lightweight text-only dependency set. Remove the marker before an
-`install-agent` run only when intentionally returning to text-only operation.
+that marker and preserve the `voice` extra. Remove the marker before running
+`make install-agent` only when returning to text-only operation.
 
 Then open `http://127.0.0.1:8123`. Hold `Shift+CapsLock` while the page is focused,
 speak, and release to transcribe and send. The on-screen button provides the same
@@ -253,21 +249,19 @@ selectors. Local transcription and silent replies remain the defaults. Browser
 speech synthesis provides local spoken output. The browser hotkey is page-scoped;
 a native desktop helper is needed before it can be system-wide.
 
-Alfred replies render a deliberately limited Markdown subset: headings, tables,
+Alfred replies support a limited Markdown subset: headings, tables,
 lists, block quotes, fenced and inline code, emphasis, rules, and HTTP(S) links.
 The server converts Markdown to an inert rendering tree and the browser creates
 DOM elements with text content; raw model HTML is never inserted into the page.
 Wide tables scroll horizontally on smaller screens. User messages and errors
 remain literal text.
 
-When a model uses tools, its reply includes a collapsed, ephemeral **Activity &
-sources** panel. Web entries show the exact queries, completion status, elapsed
-time, cache markers, warnings, and the candidate or fetched source URLs returned
-by Alfred. Weather entries show the resolved public place, MET Norway provider,
-cache state, and exact forecast URL without duplicating the hourly forecast body.
-The panel never includes page bodies, model prompts, credentials, or
-private-memory contents, and it disappears with the browser session. Alfred also
-instructs models to cite exact tool-returned URLs rather than rewriting them.
+When a model uses tools, its reply includes a collapsed **Activity & sources**
+panel for that session. Web entries show the queries, status, elapsed time, cache
+markers, warnings, and source URLs. Weather entries show the resolved public
+place, provider, cache state, and forecast URL. The panel omits page bodies,
+model prompts, credentials, and private-memory contents. Alfred tells models to
+cite the exact returned URLs instead of reconstructing them.
 
 Local requests use LM Studio's Responses API at `http://127.0.0.1:1234/v1`. On
 the first request Alfred uses an already-loaded model. If there is none, it

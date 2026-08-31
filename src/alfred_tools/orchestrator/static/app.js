@@ -243,7 +243,7 @@ function setBusy(busy, text = "") {
   input.disabled = busy;
   document.querySelector("#send").disabled = busy;
   newSession.disabled = busy;
-  statusLine.textContent = text || "Text stays in memory and is discarded with this session.";
+  statusLine.textContent = text || "This process keeps conversation history until the session ends.";
 }
 
 async function loadConfig() {
@@ -307,7 +307,7 @@ async function sendMessage(text) {
     true,
     backend.value === "remote"
       ? "Sending to OpenAI…"
-      : "Local model is working; first response can take several minutes…",
+      : "Local model is working. The first response can take several minutes.",
   );
   try {
     const response = await fetch("/api/chat", {

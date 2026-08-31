@@ -1,17 +1,17 @@
 ---
 name: alfred-personal-memory
-description: Recall and automatically preserve durable personal context in Alfred's local Markdown and weighted graph memory. Use when a user states or corrects a lasting preference, principle, decision, idea, procedure, personal note, or recurring way of working; when earlier personal or project context would improve an answer; when the user asks what Alfred remembers; or when reviewing, connecting, correcting, archiving, or exporting memory. Never use web tools to store or retrieve memory.
+description: Recall and save lasting personal context in Alfred's local Markdown and weighted graph memory. Use when a user states or corrects a lasting preference, principle, decision, idea, procedure, note, or way of working; when earlier context would improve an answer; or when the user asks to inspect, connect, correct, archive, or export memory. Never use web tools for memory.
 ---
 
-# Alfred Personal Memory
+# Alfred personal memory
 
-Use `alfred-notes` to recall and grow the user's global local knowledge graph
-without using the internet. Markdown is the source of truth; SQLite search and
-weighted graph data are rebuildable indexes.
+Use `alfred-notes` for local personal memory without using the internet.
+Markdown is the source of truth. SQLite search and graph data are rebuildable
+indexes.
 
 ## Recall relevant context
 
-Recall only when personal context could materially improve the current task:
+Recall only when personal context could improve the current task:
 
 ```bash
 alfred-notes search --query "FOCUSED TERMS" --limit 5
@@ -39,18 +39,18 @@ alfred-notes capture \
   --automatic
 ```
 
-Capture preferences, principles, decisions with reasoning, ideas worth keeping,
-corrections, and repeated working steps. Do not capture transient questions,
-casual conversation, guesses, or retrieved web content unless the user adopts
-it as their own note.
+Capture preferences, principles, reasoned decisions, ideas worth keeping,
+corrections, and repeated working steps. Skip passing questions, casual
+conversation, guesses, and retrieved web content unless the user adopts it as a
+personal note.
 
 Before capturing, search for a close duplicate. Update an existing note when it
 represents the same knowledge. Use `alfred-notes link SOURCE_ID TARGET_ID` when
 two existing notes have a meaningful relationship. Automatic notes enter the
 review queue; inspect it with `alfred-notes review`.
 
-Use global contextual labels such as `personal`, `project:alfred`, `topic:notes`,
-or `area:learning`. Prefer a few stable labels over many near-duplicates.
+Use labels such as `personal`, `project:alfred`, `topic:notes`, or
+`area:learning`. Prefer a few stable labels over many near-duplicates.
 
 ## Enforce privacy
 

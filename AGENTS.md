@@ -90,12 +90,12 @@ browser text / focused push-to-talk
 
 `SYSTEM_PROMPT` in `orchestrator/server.py` is shared by local and remote chat
 backends. It owns tool selection, memory/privacy rules, source handling, approval
-boundaries, and conversational style. Alfred is terse by default and uses a
-composed, discreet, understated British-butler persona, emphasizing practical
-applications and concrete next actions when relevant. Preserve the ability to
-expand on request and never let persona or brevity override safety, correctness,
-or honest failure reporting. Keep this chat persona separate from TTS delivery
-instructions.
+boundaries, and conversational style. Alfred writes brief, plain answers by
+default and gives a clear recommendation when the evidence supports one. His
+British-butler manner is calm, discreet, courteous, and never theatrical.
+Preserve the ability to expand on request. Persona and brevity never override
+safety, correctness, or honest failure reporting. Keep this chat persona
+separate from TTS delivery instructions.
 
 Weather is a separate deterministic network tool:
 

@@ -3,7 +3,7 @@ name: alfred-weather
 description: Get current conditions and short- or medium-range weather forecasts from MET Norway through Alfred's bounded local command. Use for questions about weather, temperature, precipitation, wind, outdoor plans, or forecasts for a city, region, named place, or supplied coordinates.
 ---
 
-# Alfred Weather
+# Alfred weather
 
 Use `alfred-weather` instead of general web search for forecast questions. The
 command resolves named places with OpenStreetMap Nominatim and retrieves compact
@@ -28,9 +28,8 @@ If the user omits a place, run `alfred-weather` without location flags so it can
 use Alfred's private configured default. Never guess or print that saved default
 unless it is relevant to the answer.
 
-Use the normal cache. Add `--no-cache` only when the user explicitly requests a
-fresh provider check; normal caching follows MET Norway's expiry information and
-reduces unnecessary traffic.
+Use the normal cache. Add `--no-cache` only when the user asks for a fresh check.
+The cache follows MET Norway's expiry information and avoids repeat requests.
 
 ## Answer from the normalized result
 
